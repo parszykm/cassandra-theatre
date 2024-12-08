@@ -58,7 +58,7 @@ Przechowuje listę rezerwacji użytkownika.
 
 ---
 
-## 4. Tabela danych o rezerwacjach użytkownika (`user_reservations`)
+## 4. Tabela danych o rezerwacjach użytkownika (`reservations_info`)
 
 Przechowuje szczegóły o rezerwacji.
 

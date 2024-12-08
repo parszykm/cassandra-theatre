@@ -1,13 +1,13 @@
-### Założenia systemu biletowego:
+# Założenia systemu biletowego
 
 1. System obsługuje wiele teatrów.
 2. Każdy teatr ma różne spektakle, daty i godziny.
 3. Każdy spektakl ma przypisane miejsca (np. sektor, rząd, miejsce).
 4. Użytkownik może rezerwować bilety, a status miejsca musi się zmieniać.
 
-### Schemat bazy danych:
+# Schemat bazy danych
 
-### 1. **Tabela spektakli (`shows_by_theater`)**
+## 1. Tabela spektakli (`shows_by_theater`)
 
 Trzyma informacje o spektaklach w danym teatrze.
 
@@ -18,13 +18,13 @@ Trzyma informacje o spektaklach w danym teatrze.
 | `show_date`     | `DATE`                                                | Data spektaklu                   |
 | `show_time`     | `TIME`                                                | Godzina spektaklu                |
 | `title`         | `TEXT`                                                | Tytuł spektaklu                  |
-| **PRIMARY KEY** | ((`theater_id`), `show_date`, `show_time`, `show_id`) |                                  |
+| **PRIMARY KEY** | ((`theater_id`), `show_date`, `show_time`, `show_id`) | Klucz główny                     |
 
-- Klucz sortujący to `show_date`, `show_time` dla szybkich odczytów po dacie i godzinie.
+- Klucz sortujący: `show_date`, `show_time` dla szybszych odczytów po dacie i godzinie.
 
 ---
 
-### 2. **Tabela miejsc w spektaklu (`seats_by_show`)**
+## 2. Tabela miejsc w spektaklu (`seats_by_show`)
 
 Śledzi dostępność miejsc dla konkretnego spektaklu.
 
@@ -36,29 +36,86 @@ Trzyma informacje o spektaklach w danym teatrze.
 | `row`              | `TEXT`                 | Rząd miejsca                         |
 | `seat_number`      | `INT`                  | Numer miejsca                        |
 | `status`           | `TEXT`                 | Status (available, reserved, sold)   |
-| `user_id`          | `UUID`                 | Id użytkownika (dla zarezerwowanych) |
+| `reservation_id`   | `UUID`                 | Id rezerwacji                       |
 | `reservation_time` | `TIMESTAMP`            | Czas rezerwacji                      |
-| **PRIMARY KEY**    | (`show_id`, `seat_id`) |                                      |
+| **PRIMARY KEY**    | (`show_id`, `seat_id`) | Klucz główny                         |
 
-- Kolumna `status` pozwala na zarządzanie dostępnością miejsc.
+- Kolumna `status` pozwala na zarządzanie dostępnością miejsc (np. `available`, `reserved`, `sold`).
 
 ---
 
-### 3. **Tabela rezerwacji użytkownika (`reservations_by_user`)**
+## 3. Tabela rezerwacji użytkownika (`reservations_by_user`)
 
 Przechowuje listę rezerwacji użytkownika.
 
 | **Kolumna**        | **Typ**                       | **Opis**                  |
 | ------------------ | ----------------------------- | ------------------------- |
-| `user_id`          | `UUID`                        | Identyfikator użytkownika |
 | `reservation_id`   | `UUID`                        | Identyfikator rezerwacji  |
 | `show_id`          | `UUID`                        | Id spektaklu              |
 | `seat_id`          | `TEXT`                        | Id miejsca                |
-| `reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`user_id`, `reservation_id`) |                           |
+| `seat_reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
+| **PRIMARY KEY**    | (`user_id`, `reservation_id`) | Klucz główny               |
 
 ---
 
-### Testowanie:
+## 4. Tabela danych o rezerwacjach użytkownika (`user_reservations`)
 
-1. Przeprowadzenie masowych rezerwacji na pojedyncze spektakle z wielu lokalizacji i zliczanie niespójności(overbooking)
+Przechowuje szczegóły o rezerwacji.
+
+| **Kolumna**        | **Typ**                       | **Opis**                  |
+| ------------------ | ----------------------------- | ------------------------- |
+| `reservation_id`   | `UUID`                        | Identyfikator rezerwacji  |
+| `show_id`          | `UUID`                        | Id spektaklu              |
+| `tickets`          | `INTEGER`                     | Liczba zarezerwowanych biletów |
+| `user_name`        | `TEXT`                        | Imię i nazwisko użytkownika |
+| `email`            | `TEXT`                        | Email użytkownika         |
+| `reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
+| **PRIMARY KEY**    | (`user_id`, `reservation_id`) | Klucz główny               |
+
+---
+
+# Dozwolone operacje
+
+## Klient:
+- **Rezerwacja miejsc**: Klient może zarezerwować określoną ilość konkretnych miejsc na dany spektakl.
+  - Operacja ta będzie polegała na utworzeniu wpisów w tabeli `reservations_by_user`, gdzie zapisane będą szczegóły dotyczące rezerwacji miejsc (np. `show_id`, `seat_id`, `seat_reservation_time`).
+
+## Admin:
+- **Tworzenie spektaklu**: Administrator może utworzyć spektakl w systemie.
+  - **Tworzenie spektaklu** automatycznie tworzy odpowiednią ilość miejsc w tabeli `seats_by_show`, odpowiadającą liczbie dostępnych biletów (liczba miejsc w spektaklu).
+  - Z każdego spektaklu generowane są miejsca w systemie, przypisując im status "available".
+
+## Działanie systemu:
+
+### 1. Rezerwacja przez klienta:
+- Klient rezerwuje miejsca na spektakl poprzez dodanie nowych rekordów do tabeli `reservations_by_user`.
+- System informuje klienta, że rezerwacja została przyjęta, ale nie potwierdza jeszcze zakupu biletów.
+- System przekazuje klientowi informację, że w przypadku pomyślnej rezerwacji, bilety zostaną wysłane w ciągu określonego czasu (np. X godzin).
+
+### 2. Monitorowanie konfliktów:
+- Co określony interwał czasu Y system monitoruje konflikty rezerwacji.
+- Konflikt występuje, gdy w tabeli `reservations_by_user` pojawią się dwa wpisy z tym samym `seat_id` (miejsce na spektaklu) dla tego samego `show_id`, co oznacza, że doszło do overbookingu.
+
+### 3. Rozwiązywanie konfliktów:
+- System identyfikuje wszystkie rezerwacje, które są częścią konfliktu, sprawdzając tabelę `reservations_by_user` na podstawie `seat_id` i `show_id`.
+- System porównuje pole `reservation_time` z tabeli `reservation_info` (timestamp rezerwacji) dla konfliktujących rezerwacji, aby ustalić, która rezerwacja jest wcześniejsza.
+- Rezerwacja z najwcześniejszym `reservation_time` uznawana jest za wczesniejszą, a jej konfliktujące miejsca są **potwierdzane**.
+- W przypadku konfliktu pózniejsza rezerwacja jest anulowana, co oznacza wycofanie rezerwacji dla wszystkich miejsc.
+- **Aktualizacja tabeli `seats_by_show`**: Zmiana statusu miejsc po potwierdzeniu rezerwacji.
+
+### 4. Potwierdzenie rezerwacji:
+- Po rozwiązaniu konfliktów, system wysyła powiadomienie do klienta o pomyślnym zakupie biletów dla potwierdzonych miejsc.
+- Klient otrzymuje także informację o anulowaniu rezerwacji w przypadku konfliktu.
+
+## Założenia:
+- **Timestamp w tabeli `reservations_info`**: Każda rezerwacja posiada unikalny `reservation_time`, który jest wykorzystywany do rozwiązywania konfliktów.
+- **Brak wsparcia dla zmian w rezerwacjach**: System nie wspiera zmiany dokonanych rezerwacji ani ich anulowania.
+- **Brak zmian w tabelach**: Konflikty są rozwiązane na podstawie porównania timestampów (`reservation_time`), ale rezerwacje nie mogą być zmieniane ani usuwane po ich zapisaniu.
+
+## Implementacja w tabelach:
+
+### 1. Tabela `seats_by_show`:
+- **Dodatkowe informacje o statusie miejsc**:
+  - `status` (values: `available`, `reserved`, `sold`).
+- Każde miejsce, które zostanie zarezerwowane, zmienia swój status na `reserved`.
+- W momencie potwierdzenia zakupu, zmienia się na `sold`.

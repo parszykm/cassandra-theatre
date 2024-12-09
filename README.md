@@ -54,7 +54,7 @@ Przechowuje listę rezerwacji użytkownika.
 | `show_id`          | `UUID`                        | Id spektaklu              |
 | `seat_id`          | `TEXT`                        | Id miejsca                |
 | `seat_reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`user_id`, `reservation_id`) | Klucz główny               |
+| **PRIMARY KEY**    | (`reservation_id`, `seat_id`) | Klucz główny               |
 
 ---
 
@@ -93,7 +93,7 @@ Przechowuje szczegóły o rezerwacji.
 - System przekazuje klientowi informację, że w przypadku pomyślnej rezerwacji, bilety zostaną wysłane w ciągu określonego czasu (np. X godzin).
 
 ### 2. Monitorowanie konfliktów:
-- Co określony interwał czasu Y system monitoruje konflikty rezerwacji.
+- Co określony interwał czasu Y system monitoruje konflikty rezerwacji, które zostały utworzone Z czasu temu(aby nie rozwiązywać konfliktów które pojawiają się w czasie rzeczywistym i są rozwiązywane przez Cassandrę).
 - Konflikt występuje, gdy w tabeli `reservations_by_user` pojawią się dwa wpisy z tym samym `seat_id` (miejsce na spektaklu) dla tego samego `show_id`, co oznacza, że doszło do overbookingu.
 
 ### 3. Rozwiązywanie konfliktów:
@@ -102,6 +102,7 @@ Przechowuje szczegóły o rezerwacji.
 - Rezerwacja z najwcześniejszym `reservation_time` uznawana jest za wczesniejszą, a jej konfliktujące miejsca są **potwierdzane**.
 - W przypadku konfliktu pózniejsza rezerwacja jest anulowana, co oznacza wycofanie rezerwacji dla wszystkich miejsc.
 - **Aktualizacja tabeli `seats_by_show`**: Zmiana statusu miejsc po potwierdzeniu rezerwacji.
+- **PYTANIE** Czy TIMESTAMP muszą być tworzone ręcznie jako nowe pola, czy Cassandra udostępnia mechanizm TIMESTAMPów domyślnie?
 
 ### 4. Potwierdzenie rezerwacji:
 - Po rozwiązaniu konfliktów, system wysyła powiadomienie do klienta o pomyślnym zakupie biletów dla potwierdzonych miejsc.

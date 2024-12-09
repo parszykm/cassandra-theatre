@@ -1,26 +1,22 @@
 # Założenia systemu biletowego
 
-1. System obsługuje wiele teatrów.
-2. Każdy teatr ma różne spektakle, daty i godziny.
-3. Każdy spektakl ma przypisane miejsca (np. sektor, rząd, miejsce).
-4. Użytkownik może rezerwować bilety, a status miejsca musi się zmieniać.
+1. Każdy teatr ma różne spektakle, daty i godziny.
+2. Każdy spektakl ma przypisane miejsca.
+3. Użytkownik może rezerwować bilety, a status miejsca musi się zmieniać.
 
 # Schemat bazy danych
 
-## 1. Tabela spektakli (`shows_by_theater`)
+## 1. Tabela spektakli (`shows`)
 
 Trzyma informacje o spektaklach w danym teatrze.
 
 | **Kolumna**     | **Typ**                                               | **Opis**                         |
 | --------------- | ----------------------------------------------------- | -------------------------------- |
-| `theater_id`    | `UUID`                                                | Unikalny identyfikator teatru    |
 | `show_id`       | `UUID`                                                | Unikalny identyfikator spektaklu |
 | `show_date`     | `DATE`                                                | Data spektaklu                   |
 | `show_time`     | `TIME`                                                | Godzina spektaklu                |
 | `title`         | `TEXT`                                                | Tytuł spektaklu                  |
-| **PRIMARY KEY** | ((`theater_id`), `show_date`, `show_time`, `show_id`) | Klucz główny                     |
-
-- Klucz sortujący: `show_date`, `show_time` dla szybszych odczytów po dacie i godzinie.
+| **PRIMARY KEY** | (`show_date`, `show_time`, `show_id`) | Klucz główny                     |
 
 ---
 
@@ -32,8 +28,6 @@ Trzyma informacje o spektaklach w danym teatrze.
 | ------------------ | ---------------------- | ------------------------------------ |
 | `show_id`          | `UUID`                 | Unikalny identyfikator spektaklu     |
 | `seat_id`          | `TEXT`                 | Identyfikator miejsca (np. A1, B2)   |
-| `section`          | `TEXT`                 | Sekcja miejsca (np. balkon, parter)  |
-| `row`              | `TEXT`                 | Rząd miejsca                         |
 | `seat_number`      | `INT`                  | Numer miejsca                        |
 | `status`           | `TEXT`                 | Status (available, reserved, sold)   |
 | `reservation_id`   | `UUID`                 | Id rezerwacji                       |
@@ -66,7 +60,7 @@ Przechowuje szczegóły o rezerwacji.
 | ------------------ | ----------------------------- | ------------------------- |
 | `reservation_id`   | `UUID`                        | Identyfikator rezerwacji  |
 | `show_id`          | `UUID`                        | Id spektaklu              |
-| `tickets`          | `INTEGER`                     | Liczba zarezerwowanych biletów |
+| `tickets_count`          | `INTEGER`                     | Liczba zarezerwowanych biletów |
 | `user_name`        | `TEXT`                        | Imię i nazwisko użytkownika |
 | `email`            | `TEXT`                        | Email użytkownika         |
 | `reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |

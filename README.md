@@ -88,6 +88,7 @@ Przechowuje szczegóły o rezerwacji.
 ## Działanie systemu:
 
 ### 1. Rezerwacja przez klienta:
+- Klient pobiera listę dostępnych miejsc na wybrany spektaktl z tabeli `seats_by_show`.
 - Klient rezerwuje miejsca na spektakl poprzez dodanie nowych rekordów do tabeli `reservations_by_user`.
 - System informuje klienta, że rezerwacja została przyjęta, ale nie potwierdza jeszcze zakupu biletów.
 - System przekazuje klientowi informację, że w przypadku pomyślnej rezerwacji, bilety zostaną wysłane w ciągu określonego czasu (np. X godzin).

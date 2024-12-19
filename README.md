@@ -48,7 +48,7 @@ Przechowuje listę rezerwacji użytkownika.
 | `show_id`          | `UUID`                        | Id spektaklu              |
 | `seat_id`          | `TEXT`                        | Id miejsca                |
 | `seat_reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`reservation_id`, `seat_id`) | Klucz główny               |
+| **PRIMARY KEY**    | (`reservation_id`, `seat_id`, CZAS) | Klucz główny               |
 
 ---
 
@@ -115,3 +115,5 @@ Przechowuje szczegóły o rezerwacji.
   - `status` (values: `available`, `reserved`, `sold`).
 - Każde miejsce, które zostanie zarezerwowane, zmienia swój status na `reserved`.
 - W momencie potwierdzenia zakupu, zmienia się na `sold`.
+
+- ZMIANA: Ograniczennie przregladania tabeli z uzyciem CZAS w celu nie przegladania calej tabeli, przemyslec cache aplikacji, watek per show na tabeli 3.

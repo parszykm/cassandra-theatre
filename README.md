@@ -48,7 +48,7 @@ Przechowuje listę rezerwacji użytkownika.
 | `show_id`          | `UUID`                        | Id spektaklu              |
 | `seat_id`          | `TEXT`                        | Id miejsca                |
 | `seat_reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`reservation_id`, `seat_id`, CZAS) | Klucz główny               |
+| **PRIMARY KEY**    | (`seat_reservation_time`,`reservation_id`, `seat_id`) | Klucz główny               |
 
 ---
 

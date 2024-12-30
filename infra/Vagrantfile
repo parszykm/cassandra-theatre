@@ -1,0 +1,51 @@
+Vagrant.configure("2") do |config|
+    
+    ### Configuration for amd64 arch
+    # config.vm.box = "bento/ubuntu-20.04"
+    # config.vm.box_version = "202407.23.0"
+    # config.vm.provider "virtualbox" do |vb|
+    #   vb.memory = "2048"  
+    #   vb.cpus = 2         
+    #   config.disksize.size = '10GB'
+    # end
+
+    ### Configuration for arm64 arch
+    config.vm.box = "bento/ubuntu-20.04-arm64"
+    config.vm.box_version = "202404.23.0"
+    config.vm.provider "vmware_fusion" do |vb|
+      vb.memory = "2048"  
+      vb.cpus = 2         
+      config.disksize.size = '10GB'
+    end
+    
+    
+    config.vm.network "private_network", type: "dhcp"  
+    config.vm.provision "shell", inline: <<-SHELL
+      
+      sudo apt-get update
+      sudo apt-get install -y openjdk-11-jdk wget
+  
+      sudo apt install apt-transport-https
+      wget -q -O - https://downloads.apache.org/cassandra/KEYS | sudo apt-key add -
+      sudo sh -c 'echo "deb https://debian.cassandra.apache.org 40x main" > /etc/apt/sources.list.d/cassandra.list'
+
+      sudo apt-get update
+      sudo apt install -y cassandra
+  
+      sudo rm -rf /var/lib/cassandra/{commitlog,data,hints,saved_caches}/*
+
+    SHELL
+  
+    
+    config.vm.define "cassandra_1" do |cassandra_vm|
+      cassandra_vm.vm.hostname = "cassandra-1"
+    end
+  
+    
+    config.vm.define "cassandra_2" do |cassandra_vm|
+      cassandra_vm.vm.hostname = "cassandra-2"
+    end
+  
+    
+  end
+  

@@ -12,8 +12,8 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Spring Boot version management -->
-        <spring-boot.version>2.6.4</spring-boot.version> <!-- Change to your preferred Spring Boot version -->
+        <!-- Spring Boot version -->
+        <spring-boot.version>2.6.4</spring-boot.version> <!-- Using a compatible version for Java 11 -->
     </properties>
 
     <dependencyManagement>
@@ -30,7 +30,7 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- Spring Boot Starter Web -->
+        <!-- Spring Boot Starter Web for building web applications -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -42,7 +42,7 @@
             <artifactId>spring-boot-starter-data-cassandra</artifactId>
         </dependency>
 
-        <!-- Apache Commons Lang -->
+        <!-- Apache Commons Lang for utility functions -->
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
@@ -55,6 +55,7 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version> <!-- Ensure the plugin uses the correct version -->
             </plugin>
         </plugins>
     </build>

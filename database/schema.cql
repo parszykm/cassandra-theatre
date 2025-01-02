@@ -37,4 +37,4 @@ CREATE TABLE IF NOT EXISTS reservations_info (
     email TEXT,
     reservation_time TIMESTAMP,
     PRIMARY KEY ((reservation_id), show_id, reservation_time)
-) WITH CLUSTERING ORDER BY (reservation_time DESC);
+) WITH CLUSTERING ORDER BY (show_id DESC, reservation_time DESC);

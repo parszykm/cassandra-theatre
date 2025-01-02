@@ -5,15 +5,18 @@ import org.springframework.data.cassandra.core.mapping.Table;
 
 import java.util.UUID;
 
-@Table("reservations_info")
 public class ReservationInfo {
-    @PrimaryKey
+
+    @PrimaryKeyColumn(name = "reservation_id", ordinal = 0)
     private UUID reservationId;
+
+    @PrimaryKeyColumn(name = "show_id", ordinal = 1)
     private UUID showId;
+
+    @PrimaryKeyColumn(name = "reservation_time", ordinal = 2)
+    private long reservationTime;
+
     private int ticketsCount;
     private String userName;
     private String email;
-    private long reservationTime;
-
-    // Getters and setters
 }

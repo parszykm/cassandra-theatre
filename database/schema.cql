@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS shows (
     show_time TIME,
     title TEXT,
     PRIMARY KEY ((show_date, show_time), show_id)
-) WITH CLUSTERING ORDER BY (show_id ASC);;
+) WITH CLUSTERING ORDER BY (show_id ASC);
 
 CREATE TABLE IF NOT EXISTS seats_by_show (
     show_id UUID,

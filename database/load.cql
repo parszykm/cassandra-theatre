@@ -1,4 +1,4 @@
-USE theater;
+USE theatre;
 
 INSERT INTO shows (show_id, show_date, show_time, title)
 VALUES (uuid(), '2025-01-10', '19:00:00', 'Phantom of the Opera');

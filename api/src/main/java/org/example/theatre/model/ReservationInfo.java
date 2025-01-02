@@ -1,4 +1,4 @@
-package com.example.theater.model;
+package org.example.theatre.model;
 
 import org.springframework.data.cassandra.core.mapping.PrimaryKey;
 import org.springframework.data.cassandra.core.mapping.Table;

@@ -1,7 +1,10 @@
-package com.example.theater.controller;
+package org.example.theatre.controller;
 
-import com.example.theater.repository.ShowRepository;
+import org.example.theatre.model.Show;
+import org.example.theatre.repository.ShowRepository;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/shows")
@@ -13,8 +16,9 @@ public class ShowController {
     }
 
     @GetMapping
-    public String getAllShows() {
-        return "Placeholder for retrieving all shows";
+    public List<Show> getAllShows() {
+
+        return showRepository.findAll();
     }
 
     @PostMapping

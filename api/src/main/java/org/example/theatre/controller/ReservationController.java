@@ -1,6 +1,6 @@
-package com.example.theater.controller;
+package org.example.theatre.controller;
 
-import com.example.theater.repository.ReservationInfoRepository;
+import org.example.theatre.repository.ReservationInfoRepository;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

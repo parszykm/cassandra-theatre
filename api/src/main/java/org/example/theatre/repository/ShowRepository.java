@@ -1,6 +1,6 @@
-package com.example.theater.repository;
+package org.example.theatre.repository;
 
-import com.example.theater.model.Show;
+import org.example.theatre.model.Show;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Repository;
 

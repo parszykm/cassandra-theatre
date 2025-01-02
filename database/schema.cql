@@ -1,3 +1,8 @@
+CREATE KEYSPACE IF NOT EXISTS theatre
+    WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 };
+
+USE theatre;
+
 CREATE TABLE IF NOT EXISTS shows (
     show_id UUID,
     show_date DATE,

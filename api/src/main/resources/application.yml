@@ -1,0 +1,8 @@
+spring:
+  data:
+    cassandra:
+      contact-points: [192.168.228.139]
+      port: 9042
+      keyspace-name: theater
+      local-datacenter: datacenter1
+      schema-action: none

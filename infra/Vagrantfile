@@ -32,7 +32,8 @@ Vagrant.configure("2") do |config|
 
       sudo apt-get update
       sudo apt install -y cassandra
-  
+      sudo apt install maven -y
+      sudo systemctl stop cassandra
       sudo rm -rf /var/lib/cassandra/{commitlog,data,hints,saved_caches}/*
 
     SHELL

@@ -15,7 +15,8 @@ public class BackendSession {
 
 	private static final Logger logger = LoggerFactory.getLogger(BackendSession.class);
 
-	public final Session session;
+	public final Session
+			session;
 
 	public BackendSession() throws BackendException {
 		String contactPoint;

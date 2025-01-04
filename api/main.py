@@ -3,6 +3,7 @@ from cassandra.cluster import Cluster
 import configparser
 import sys
 import uuid
+from datetime import datetime
 
 class BackendSession:
     def __init__(self):
@@ -28,6 +29,9 @@ class BackendSession:
             return []
     def add_show(self, show_date, show_time, title):
         try:
+            show_date = datetime.strptime(show_date, "%d/%m/%Y").date()
+            show_time = datetime.strptime(show_time, "%H:%M:%S").time()
+        
             query = """
             INSERT INTO shows (show_id, show_date, show_time, title)
             VALUES (%s, %s, %s, %s)
@@ -61,7 +65,7 @@ def home():
 		return jsonify({'description': 'Cassandra Theatre API'})
 
 
-@app.route('/shows', methods = ['GET'])
+@app.route('/shows', methods = ['GET', 'POST'])
 def get_shows():
     backend = BackendSession()
     if request.method == 'GET':
@@ -78,7 +82,10 @@ def get_shows():
             
             try:
                 show_id = backend.add_show(show_date, show_time, title)
-                return jsonify({'message': 'Show added successfully', 'show_id': show_id}), 201
+                if show_id is not None:
+                    return jsonify({'message': 'Show added successfully', 'show_id': show_id}), 201
+                else:
+                    return jsonify({'error': f'Could not add show'}), 500
             except Exception as e:
                 return jsonify({'error': f'Could not add show: {e}'}), 500
         

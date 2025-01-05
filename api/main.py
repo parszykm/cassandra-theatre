@@ -71,7 +71,7 @@ class BackendSession:
             SELECT seat_id FROM seats_by_show
             WHERE show_id = %s AND status = %s
             """
-            rows = self.session.query(query, (show_id, status))
+            rows = self.session.execute(query, (show_id, status))
             return [str(row.seat_id) for row in rows]
         except Exception as e:
             print(f"Could not get the seats: {e}", file=sys.stderr)
@@ -177,17 +177,19 @@ def shows():
             except Exception as e:
                 return jsonify({'error': f'Could not add the show: {e}'}), 500
         
-@app.route('/shows', methods=['GET','POST'])
+@app.route('/reservations', methods=['GET','POST'])
 def reservations():
     backend = BackendSession()
     data = request.json
     if request.method == 'GET':
-        email = data['email']
+        email = request.args.get('email')
+        if not email:
+            return jsonify({'error': 'Missing required parameter: email'}), 400
         reservations = backend.get_reservations(email=email)
         if reservations is not None:
-            return jsonify(reservations), 201
+            return jsonify(reservations), 200
         else:
-            return jsonify({'error': f'Could not get the reservation'}), 500
+            return jsonify({'error': 'Could not get reservations'}), 500
     elif request.method == 'POST':
         email = data['email']
         user_name = data['user_name']
@@ -204,14 +206,15 @@ def reservations():
 @app.route('/seats', methods=['GET'])
 def seats():
     backend = BackendSession()
-    data = request.json
-    if request.method == 'GET':
-        show_id = data['show_id']
-        seats = backend.get_seats(show_id)
-        if seats is not None:
-            return jsonify(seats), 201
-        else:
-            return jsonify({'error': f'Could not get the seats'}), 500
+    show_id = request.args.get('show_id')
+    if not show_id:
+        return jsonify({'error': 'Missing required parameter: show_id'}), 400
+    seats = backend.get_seats(show_id)
+    if seats is not None:
+        return jsonify(seats), 200
+    else:
+        return jsonify({'error': 'Could not get the seats'}), 500
+
 
         
 if __name__ == '__main__':

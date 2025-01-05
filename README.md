@@ -32,7 +32,7 @@ Trzyma informacje o spektaklach w danym teatrze.
 | `status`           | `TEXT`                 | Status (available, reserved, sold)   |
 | `reservation_id`   | `UUID`                 | Id rezerwacji                       |
 | `reservation_time` | `TIMESTAMP`            | Czas rezerwacji                      |
-| **PRIMARY KEY**    | (`show_id`,`status`, `seat_id`) | Klucz główny                         |
+| **PRIMARY KEY**    | (`show_id`, `seat_id`) | Klucz główny                         |
 
 - Kolumna `status` pozwala na zarządzanie dostępnością miejsc (np. `available`, `reserved`, `sold`).
 

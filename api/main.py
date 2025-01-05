@@ -71,7 +71,7 @@ class BackendSession:
             SELECT seat_id FROM seats_by_show
             WHERE show_id = %s AND status = %s
             """
-            rows = self.session.execute(query, (show_id, status))
+            rows = self.session.execute(query, (uuid.UUID(show_id), status))
             return [str(row.seat_id) for row in rows]
         except Exception as e:
             print(f"Could not get the seats: {e}", file=sys.stderr)

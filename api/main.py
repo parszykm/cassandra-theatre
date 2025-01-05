@@ -86,8 +86,8 @@ class BackendSession:
             result = []
             rows = self.session.execute(query, (email))
             for row in rows:
-                reservation_id = str(row.reservation_id)
-                show_id = str(row.show_id)
+                reservation_id = uuid.UUID(row.reservation_id)
+                show_id = uuid.UUID(row.show_id)
                 reservation = {
                     "email": email,
                     "tickets": str(row.tickets_count),
@@ -118,6 +118,9 @@ class BackendSession:
             return None
     def check_seats_availability(self, show_id, seats):
         available_seats = set(self.get_seats(show_id))
+        print(available_seats)
+        print(seats)
+        print(all(seat in available_seats for seat in seats))
         return all(seat in available_seats for seat in seats)
     def make_reservation(self, email, show_id, seats, user_name):
         try:
@@ -127,20 +130,26 @@ class BackendSession:
             """
             reservation_id = uuid.uuid4()
             reservation_time = datetime.now()
+            show_id = uuid.UUID(show_id)
             
             ### Check if chosen seats are not already reserved
-            if self.check_seats_availability(show_id, seats):
+            if not self.check_seats_availability(show_id, seats):
                 return 1
             for seat in seats:
                 self.session.execute(query, (reservation_id, show_id, reservation_time, seat))
+                query="""
+                UPDATE seats_by_show SET status = %s WHERE show_id = %s AND status = %s AND seat_id = %s
+                """
+                self.session.execute(query, (Status.RESERVED.value, show_id, Status.AVAILABLE.value, seat))
+    
             
             query="""
-            INSERT INTO reservation_info (reservation_id, show_id, tickets_count, user_name, email, reservation_time)
+            INSERT INTO reservations_info (reservation_id, show_id, tickets_count, user_name, email, reservation_time)
             VALUES (%s, %s, %s, %s, %s, %s)
             """
             ticket_count = len(seats)
             self.session.execute(query, (reservation_id, show_id, ticket_count, user_name, email, reservation_time))
-            
+            return 0
         except Exception as e:
             print(f"Error while creating reservation: {e}")
             return 2

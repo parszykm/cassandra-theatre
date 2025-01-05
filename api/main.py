@@ -68,7 +68,7 @@ class BackendSession:
     def get_seats(self, show_id, status=Status.AVAILABLE.value):
         try:
             query="""
-            SELECT seat_id FROM seats_by_show
+            SELECT seat_id, status FROM seats_by_show
             WHERE show_id = %s
             """
             rows = self.session.execute(query, (show_id, status))
@@ -125,36 +125,37 @@ class BackendSession:
         return all(seat in available_seats for seat in seats)
     def make_reservation(self, email, show_id, seats, user_name):
         try:
-            query="""
+            query_insert_reservation = """
             INSERT INTO reservations_by_user (reservation_id, show_id, seat_reservation_time, seat_id)
             VALUES (%s, %s, %s, %s)
             """
-            reservation_id = uuid.uuid4()
-            reservation_time = datetime.now()
-            show_id = uuid.UUID(show_id)
-            
-            ### Check if chosen seats are not already reserved
-            if not self.check_seats_availability(show_id, seats):
-                return 1
-            for seat in seats:
-                self.session.execute(query, (reservation_id, show_id, reservation_time, seat))
-                query="""
-                UPDATE seats_by_show SET status = %s WHERE show_id = %s AND status = %s AND seat_id = %s
-                """
-                self.session.execute(query, (Status.RESERVED.value, show_id, Status.AVAILABLE.value, seat))
-    
-            
-            query="""
+            query_update_seat = """
+            UPDATE seats_by_show SET status = %s WHERE show_id = %s AND seat_id = %s
+            """
+            query_insert_info = """
             INSERT INTO reservations_info (reservation_id, show_id, tickets_count, user_name, email, reservation_time)
             VALUES (%s, %s, %s, %s, %s, %s)
             """
+
+            reservation_id = uuid.uuid4()
+            reservation_time = datetime.now()
+            show_id = uuid.UUID(show_id) 
+
+            # Check if the chosen seats are available
+            if not self.check_seats_availability(show_id, seats):
+                return 1
+
+            for seat in seats:
+                self.session.execute(query_insert_reservation, (reservation_id, show_id, reservation_time, seat))
+                self.session.execute(query_update_seat, (Status.RESERVED.value, show_id, seat))
+                
             ticket_count = len(seats)
-            self.session.execute(query, (reservation_id, show_id, ticket_count, user_name, email, reservation_time))
+            self.session.execute(query_insert_info, (reservation_id, show_id, ticket_count, user_name, email, reservation_time))
+
             return 0
         except Exception as e:
             print(f"Error while creating reservation: {e}")
-            return 2
-        
+            return 2  
 app = Flask(__name__)
 
 @app.route('/', methods = ['GET', 'POST'])
@@ -216,7 +217,7 @@ def reservations():
 @app.route('/seats', methods=['GET'])
 def seats():
     backend = BackendSession()
-    show_id = request.args.get('show_id')
+    show_id = uuid.UUID(request.args.get('show_id'))
     if not show_id:
         return jsonify({'error': 'Missing required parameter: show_id'}), 400
     seats = backend.get_seats(show_id)

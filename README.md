@@ -64,7 +64,7 @@ Przechowuje szczegóły o rezerwacji.
 | `user_name`        | `TEXT`                        | Imię i nazwisko użytkownika |
 | `email`            | `TEXT`                        | Email użytkownika         |
 | `reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`user_id`, `reservation_id`) | Klucz główny               |
+| **PRIMARY KEY**    | (`email`, `reservation_id`) | Klucz główny               |
 
 ---
 

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS seats_by_show (
     status TEXT, -- possible values: 'available', 'reserved', 'sold'
     reservation_id UUID,
     reservation_time TIMESTAMP,
-    PRIMARY KEY ((show_id, status), seat_id)
+    PRIMARY KEY ((show_id), seat_id)
 ) WITH CLUSTERING ORDER BY (seat_id ASC);
 
 CREATE TABLE IF NOT EXISTS reservations_by_user (

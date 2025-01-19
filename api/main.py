@@ -1,11 +1,16 @@
 from flask import Flask, jsonify, request
+from collections import defaultdict
 from cassandra.cluster import Cluster
 import configparser
 import sys
 import uuid
 from datetime import datetime
 import string
+import threading
+import time
 from enum import Enum
+from datetime import datetime, timedelta
+
 
 class Status(Enum):
     AVAILABLE = 'available'
@@ -23,6 +28,167 @@ class BackendSession:
             self.session = self.cluster.connect(self.keyspace)
         except Exception as e:
             print(f"Couldn't connect to cluster:{e}", file=sys.stderr)
+
+    def resolve_conflicts(self,show_id):
+        try:
+            winning_reservations, losing_reservations = self.get_winning_reservations(show_id)
+            for winning_reservation in winning_reservations:
+                get_seats_query = """
+                SELECT seat_id
+                FROM reservations_by_user
+                where reservation_id = %s
+                """
+
+                update_seat_query = """
+                UPDATE seats_by_show
+                SET reservation_id = %s, status = 'sold'
+                WHERE show_id = %s AND seat_id = %s
+                """
+                rows = self.session.execute(get_seats_query, (uuid.UUID(winning_reservation),))
+                for row in rows:
+                    seat_id = row.seat_id
+                    self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), uuid.UUID(show_id), seat_id))
+
+            for losing_reservation in losing_reservations:
+                print("Sending information about unsuccessful reservation to reservation: {losing_reservation}")
+        except Exception as e:
+            print(f"Error while resolving conflicts for show {show_id}: {e}", file=sys.stderr)
+            return None
+
+
+    def get_winning_reservations(self, show_id):
+        try:
+            grouped_reservations, winning_reservations = self.get_seat_groups_with_multiple_reservations(show_id)
+            if grouped_reservations is None:
+                return None
+
+            losing_reservations = []
+
+            for seat_id, reservations in grouped_reservations.items():
+#check if seat_id is not already taken
+                get_seat_query =  """
+                SELECT seat_id, status, reservation_id
+                FROM seats_by_show
+                where seat_id = %s and show_id = %s
+                """
+
+                seat_already_taken = False
+                seats = self.session.execute(get_seat_query,(uuid.UUID(seat_id), uuid.UUID(show_id)))
+
+                for seat in seats:
+                    if seat["status"] == 'sold':
+                        seat_already_taken = True
+                        previous_winner = seat["reservation_id"]
+
+                
+
+                reservation_ids = [row['reservation_id'] for row in reservations]
+
+                if seat_already_taken:
+                    for reservation_id in reservation_ids:
+                        losing_reservations.append(reservation_id)
+                    if previous_winner in losing_reservations:
+                        losing_reservations.remove(previous_winner)
+                        continue
+
+                reservations_query = """
+                SELECT reservation_id, show_id, reservation_time
+                FROM reservations_info
+                WHERE reservation_id = %s
+                """
+                reservation_details = []
+                for reservation_id in reservation_ids:
+                    rows = self.session.execute(reservations_query, (uuid.UUID(reservation_id),))
+                    for row in rows:
+                        reservation_details.append({
+                            "reservation_id": str(row.reservation_id),
+                            "seat_id": row.seat_id,
+                            "reservation_time": row.reservation_time
+                        })
+
+                earliest_reservation = min(reservation_details, key=lambda x: x['reservation_time'])
+
+                for reservation_id in reservation_ids:
+                    if reservation_id in winning_reservations:
+                        winning_reservations.remove(reservation_id)
+                    losing_reservations.append(reservation_id)
+
+                winning_reservations.append(earliest_reservation["reservation_id"])
+
+                if earliest_reservation["reservation_id"] in losing_reservations:
+                    losing_reservations.remove(earliest_reservation["reservation_id"])
+
+            return winning_reservations, losing_reservations
+
+        except Exception as e:
+            print(f"Error while analyzing seat reservations for show {show_id}: {e}", file=sys.stderr)
+            return None
+    def get_seat_groups_with_multiple_reservations(self, show_id):
+        try:
+            reservations = self.get_reservations_for_show(show_id)
+            if reservations is None:
+                return None
+
+            grouped_reservations = defaultdict(list)
+            for reservation in reservations:
+                grouped_reservations[reservation['seat_id']].append(reservation)
+
+            filtered_groups = {seat_id: res_list for seat_id, res_list in grouped_reservations.items() if len(res_list) > 1}
+
+            reservation_ids_in_filtered_groups = {
+                reservation['reservation_id']
+                for res_list in filtered_groups.values()
+                for reservation in res_list
+            }
+
+            remaining_reservation_ids = [
+                reservation['reservation_id']
+                for reservation in reservations
+                if reservation['reservation_id'] not in reservation_ids_in_filtered_groups
+            ]
+
+            return filtered_groups, remaining_reservation_ids
+        except Exception as e:
+            print(f"Error while grouping reservations for show {show_id}: {e}", file=sys.stderr)
+            return None
+    def get_reservations_for_show(self, show_id):
+        try:
+            query = """
+            SELECT reservation_id, seat_id, seat_reservation_time
+            FROM reservations_by_user
+            WHERE show_id = %s
+            """
+            rows = self.session.execute(query, (show_id,))
+
+            # query = """
+            # SELECT reservation_id, seat_id, seat_reservation_time
+            # FROM reservations_by_user
+            # WHERE show_id = %s
+            # AND seat_reservation_time <= %s
+            # AND seat_reservation_time > %s;
+            # """
+
+            # now = datetime.utcnow()
+            # five_minutes_ago = now - timedelta(minutes=5)
+            # ten_minutes_ago = now - timedelta(minutes=10)
+
+            # rows = self.session.execute(query, (show_id, five_minutes_ago, ten_minutes_ago))
+            #### jesli chcemy po czasie
+
+            results = []
+            for row in rows:
+                obj = {
+                "reservation_id": str(row.reservation_id),
+                "seat_id": row.seat_id,
+                "seat_reservation_time": str(row.seat_reservation_time)
+                }
+
+                if obj["reservation_id"] not in resolved_reservations_cache:
+                    results.append(obj)
+
+        except Exception as e:
+            print(f"Error while fetching reservations for show {show_id}: {e}", file=sys.stderr)
+            return None
     def get_all_shows(self):
         try:
             query = "SELECT * FROM shows"
@@ -142,8 +308,9 @@ class BackendSession:
             show_id = uuid.UUID(show_id) 
 
             # Check if the chosen seats are available
-            if not self.check_seats_availability(show_id, seats):
-                return 1
+            # if not self.check_seats_availability(show_id, seats):
+            #     return 1
+            #COMMENTED FOR TEST PURPOUSE
 
             for seat in seats:
                 self.session.execute(query_insert_reservation, (reservation_id, show_id, reservation_time, seat))
@@ -157,6 +324,9 @@ class BackendSession:
             print(f"Error while creating reservation: {e}")
             return 2  
 app = Flask(__name__)
+
+resolved_reservations_cache = []
+shows_to_observe_cache = []
 
 @app.route('/', methods = ['GET', 'POST'])
 def home():
@@ -226,7 +396,25 @@ def seats():
     else:
         return jsonify({'error': 'Could not get the seats'}), 500
 
+def resolve_conflicts_task(app_context, show_id):
+    with app_context:
+        backend = BackendSession()
+        backend.resolve_conflicts(show_id)
+
+
+def generate_conflict_resolving_tasks(app_context):
+    with app_context:
+        while True:
+            for show in shows_to_observe_cache:
+                threading.Thread(target=resolve_conflicts_task, args=(app_context,show), daemon = True)
+            time.sleep(5*60)
 
         
 if __name__ == '__main__':
-	app.run(debug = True,host='0.0.0.0', port=8080)
+    app_context = app.app_context()
+    app_context.push()
+
+    #generator_task = threading.Thread(target=generate_conflict_resolving_tasks, args=(app_context), daemon = True)
+
+    app.run(debug = True,host='0.0.0.0', port=8080)
+    

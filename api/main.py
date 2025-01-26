@@ -47,11 +47,14 @@ class BackendSession:
                 """
                 rows = self.session.execute(get_seats_query, (uuid.UUID(winning_reservation),))
 
+                resolved_reservations_cache.append(winning_reservation)
+
                 for row in rows:
                     seat_id = row.seat_id
                     self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), show_id, seat_id))
 
             for losing_reservation in losing_reservations:
+                resolved_reservations_cache.append(losing_reservation)
                 print("Sending information about unsuccessful reservation to reservation:", losing_reservation)
         except Exception as e:
             print(f"Error while resolving conflicts for show {show_id}: {e}", file=sys.stderr)

@@ -31,12 +31,14 @@ class BackendSession:
 
     def resolve_conflicts(self,show_id):
         try:
+            print("resolve_conflicts:")
             winning_reservations, losing_reservations = self.get_winning_reservations(show_id)
             for winning_reservation in winning_reservations:
                 get_seats_query = """
                 SELECT seat_id
                 FROM reservations_by_user
                 where reservation_id = %s
+                ALLOW FILTERING
                 """
 
                 update_seat_query = """
@@ -45,9 +47,10 @@ class BackendSession:
                 WHERE show_id = %s AND seat_id = %s
                 """
                 rows = self.session.execute(get_seats_query, (uuid.UUID(winning_reservation),))
+
                 for row in rows:
                     seat_id = row.seat_id
-                    self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), uuid.UUID(show_id), seat_id))
+                    self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), show_id, seat_id))
 
             for losing_reservation in losing_reservations:
                 print("Sending information about unsuccessful reservation to reservation: {losing_reservation}")
@@ -57,6 +60,7 @@ class BackendSession:
 
 
     def get_winning_reservations(self, show_id):
+        print("get_winning_reservations:")
         try:
             grouped_reservations, winning_reservations = self.get_seat_groups_with_multiple_reservations(show_id)
             if grouped_reservations is None:
@@ -71,16 +75,13 @@ class BackendSession:
                 FROM seats_by_show
                 where seat_id = %s and show_id = %s
                 """
-
                 seat_already_taken = False
-                seats = self.session.execute(get_seat_query,(uuid.UUID(seat_id), uuid.UUID(show_id)))
+                seats = self.session.execute(get_seat_query,(seat_id, show_id))
 
                 for seat in seats:
-                    if seat["status"] == 'sold':
+                    if seat.status == 'sold':
                         seat_already_taken = True
-                        previous_winner = seat["reservation_id"]
-
-                
+                        previous_winner = seat.reservation_id
 
                 reservation_ids = [row['reservation_id'] for row in reservations]
 
@@ -92,17 +93,18 @@ class BackendSession:
                         continue
 
                 reservations_query = """
-                SELECT reservation_id, show_id, reservation_time
+                SELECT reservation_id, reservation_time
                 FROM reservations_info
                 WHERE reservation_id = %s
+                ALLOW FILTERING
                 """
                 reservation_details = []
                 for reservation_id in reservation_ids:
                     rows = self.session.execute(reservations_query, (uuid.UUID(reservation_id),))
                     for row in rows:
+                        print(row)
                         reservation_details.append({
                             "reservation_id": str(row.reservation_id),
-                            "seat_id": row.seat_id,
                             "reservation_time": row.reservation_time
                         })
 
@@ -117,6 +119,8 @@ class BackendSession:
 
                 if earliest_reservation["reservation_id"] in losing_reservations:
                     losing_reservations.remove(earliest_reservation["reservation_id"])
+            
+            print(winning_reservations, losing_reservations)
 
             return winning_reservations, losing_reservations
 
@@ -124,6 +128,7 @@ class BackendSession:
             print(f"Error while analyzing seat reservations for show {show_id}: {e}", file=sys.stderr)
             return None
     def get_seat_groups_with_multiple_reservations(self, show_id):
+        print("get_seat_groups_with_multiple_reservations")
         try:
             reservations = self.get_reservations_for_show(show_id)
             if reservations is None:
@@ -133,7 +138,13 @@ class BackendSession:
             for reservation in reservations:
                 grouped_reservations[reservation['seat_id']].append(reservation)
 
+            print("Grouped reservations:")
+            print(grouped_reservations)
+
             filtered_groups = {seat_id: res_list for seat_id, res_list in grouped_reservations.items() if len(res_list) > 1}
+
+            print("Filtered reservations:")
+            print(filtered_groups)
 
             reservation_ids_in_filtered_groups = {
                 reservation['reservation_id']
@@ -141,23 +152,32 @@ class BackendSession:
                 for reservation in res_list
             }
 
+            print("Reservation ids in filtered:")
+            print(reservation_ids_in_filtered_groups)
+
             remaining_reservation_ids = [
                 reservation['reservation_id']
                 for reservation in reservations
                 if reservation['reservation_id'] not in reservation_ids_in_filtered_groups
             ]
+            
+            print("Remaining ids:")
+            print(remaining_reservation_ids)
 
             return filtered_groups, remaining_reservation_ids
         except Exception as e:
             print(f"Error while grouping reservations for show {show_id}: {e}", file=sys.stderr)
             return None
     def get_reservations_for_show(self, show_id):
+        print("get_reservations_for_show:")
         try:
             query = """
             SELECT reservation_id, seat_id, seat_reservation_time
             FROM reservations_by_user
             WHERE show_id = %s
+            ALLOW FILTERING
             """
+            #trzeba dodac show_id do klucza
             rows = self.session.execute(query, (show_id,))
 
             # query = """
@@ -169,7 +189,7 @@ class BackendSession:
             # """
 
             # now = datetime.utcnow()
-            # five_minutes_ago = now - timedelta(minutes=5)
+            # five_minutes_ago = now - timedelta(minutes=4)
             # ten_minutes_ago = now - timedelta(minutes=10)
 
             # rows = self.session.execute(query, (show_id, five_minutes_ago, ten_minutes_ago))
@@ -185,6 +205,9 @@ class BackendSession:
 
                 if obj["reservation_id"] not in resolved_reservations_cache:
                     results.append(obj)
+
+            print(results)
+            return results
 
         except Exception as e:
             print(f"Error while fetching reservations for show {show_id}: {e}", file=sys.stderr)
@@ -395,6 +418,15 @@ def seats():
         return jsonify(seats), 200
     else:
         return jsonify({'error': 'Could not get the seats'}), 500
+
+@app.route('/resolve_conflicts', methods=['GET'])
+def resolve():
+    backend = BackendSession()
+    show_id = uuid.UUID(request.args.get('show_id'))
+    if not show_id:
+        return jsonify({'error': 'Missing required parameter: show_id'}), 400
+    backend.resolve_conflicts(show_id)
+    return jsonify("Resolving conflicts"), 200
 
 def resolve_conflicts_task(app_context, show_id):
     with app_context:

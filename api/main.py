@@ -31,7 +31,6 @@ class BackendSession:
 
     def resolve_conflicts(self,show_id):
         try:
-            print("resolve_conflicts:")
             winning_reservations, losing_reservations = self.get_winning_reservations(show_id)
             for winning_reservation in winning_reservations:
                 get_seats_query = """
@@ -53,14 +52,13 @@ class BackendSession:
                     self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), show_id, seat_id))
 
             for losing_reservation in losing_reservations:
-                print("Sending information about unsuccessful reservation to reservation: {losing_reservation}")
+                print("Sending information about unsuccessful reservation to reservation:", losing_reservation)
         except Exception as e:
             print(f"Error while resolving conflicts for show {show_id}: {e}", file=sys.stderr)
             return None
 
 
     def get_winning_reservations(self, show_id):
-        print("get_winning_reservations:")
         try:
             grouped_reservations, winning_reservations = self.get_seat_groups_with_multiple_reservations(show_id)
             if grouped_reservations is None:
@@ -120,15 +118,12 @@ class BackendSession:
                 if earliest_reservation["reservation_id"] in losing_reservations:
                     losing_reservations.remove(earliest_reservation["reservation_id"])
             
-            print(winning_reservations, losing_reservations)
-
             return winning_reservations, losing_reservations
 
         except Exception as e:
             print(f"Error while analyzing seat reservations for show {show_id}: {e}", file=sys.stderr)
             return None
     def get_seat_groups_with_multiple_reservations(self, show_id):
-        print("get_seat_groups_with_multiple_reservations")
         try:
             reservations = self.get_reservations_for_show(show_id)
             if reservations is None:
@@ -138,13 +133,7 @@ class BackendSession:
             for reservation in reservations:
                 grouped_reservations[reservation['seat_id']].append(reservation)
 
-            print("Grouped reservations:")
-            print(grouped_reservations)
-
             filtered_groups = {seat_id: res_list for seat_id, res_list in grouped_reservations.items() if len(res_list) > 1}
-
-            print("Filtered reservations:")
-            print(filtered_groups)
 
             reservation_ids_in_filtered_groups = {
                 reservation['reservation_id']
@@ -152,18 +141,12 @@ class BackendSession:
                 for reservation in res_list
             }
 
-            print("Reservation ids in filtered:")
-            print(reservation_ids_in_filtered_groups)
-
             remaining_reservation_ids = [
                 reservation['reservation_id']
                 for reservation in reservations
                 if reservation['reservation_id'] not in reservation_ids_in_filtered_groups
             ]
             
-            print("Remaining ids:")
-            print(remaining_reservation_ids)
-
             return filtered_groups, remaining_reservation_ids
         except Exception as e:
             print(f"Error while grouping reservations for show {show_id}: {e}", file=sys.stderr)
@@ -171,28 +154,29 @@ class BackendSession:
     def get_reservations_for_show(self, show_id):
         print("get_reservations_for_show:")
         try:
-            query = """
-            SELECT reservation_id, seat_id, seat_reservation_time
-            FROM reservations_by_user
-            WHERE show_id = %s
-            ALLOW FILTERING
-            """
-            #trzeba dodac show_id do klucza
-            rows = self.session.execute(query, (show_id,))
-
             # query = """
             # SELECT reservation_id, seat_id, seat_reservation_time
             # FROM reservations_by_user
             # WHERE show_id = %s
-            # AND seat_reservation_time <= %s
-            # AND seat_reservation_time > %s;
+            # ALLOW FILTERING
             # """
+            # #trzeba dodac show_id do klucza
+            # rows = self.session.execute(query, (uuid.UUID(show_id),))
 
-            # now = datetime.utcnow()
-            # five_minutes_ago = now - timedelta(minutes=4)
-            # ten_minutes_ago = now - timedelta(minutes=10)
+            query = """
+            SELECT reservation_id, seat_id, seat_reservation_time
+            FROM reservations_by_user
+            WHERE show_id = %s
+            AND seat_reservation_time <= %s
+            AND seat_reservation_time > %s
+            ALLOW FILTERING
+            """
 
-            # rows = self.session.execute(query, (show_id, five_minutes_ago, ten_minutes_ago))
+            now = datetime.utcnow()
+            five_minutes_ago = now - timedelta(minutes=4)
+            ten_minutes_ago = now - timedelta(minutes=10)
+
+            rows = self.session.execute(query, (uuid.UUID(show_id), five_minutes_ago, ten_minutes_ago))
             #### jesli chcemy po czasie
 
             results = []
@@ -350,6 +334,7 @@ app = Flask(__name__)
 
 resolved_reservations_cache = []
 shows_to_observe_cache = []
+is_task_running = False
 
 @app.route('/', methods = ['GET', 'POST'])
 def home():
@@ -375,6 +360,7 @@ def shows():
             try:
                 show_id = backend.add_show(show_date, show_time, title)
                 if show_id is not None:
+                    shows_to_observe_cache.append(show_id)
                     return jsonify({'message': 'Show added successfully', 'show_id': show_id}), 201
                 else:
                     return jsonify({'error': f'Could not add the show'}), 500
@@ -430,23 +416,36 @@ def resolve():
 
 def resolve_conflicts_task(app_context, show_id):
     with app_context:
+        print("Resolving task initialized for show: ",show_id)
         backend = BackendSession()
         backend.resolve_conflicts(show_id)
+        print("Finished resolving conflicts for show: ", show_id)
 
 
-def generate_conflict_resolving_tasks(app_context):
-    with app_context:
-        while True:
-            for show in shows_to_observe_cache:
-                threading.Thread(target=resolve_conflicts_task, args=(app_context,show), daemon = True)
-            time.sleep(5*60)
+def generate_conflict_resolving_tasks(app_context): 
+    global is_task_running
+    if not is_task_running:
+        is_task_running = True
+
+        print("Conflicts resolving task initalized.")
+    
+        with app_context:
+            while True:
+                for show in shows_to_observe_cache:
+                    print("Resolving conflicts for a show: ", show)
+                    task = threading.Thread(target=resolve_conflicts_task, args=(app_context,show), daemon = True)
+                    task.start()
+
+                print("Sleeping 5 minutes before next conflicts resolving.")
+                time.sleep(1*60)
 
         
 if __name__ == '__main__':
     app_context = app.app_context()
     app_context.push()
 
-    #generator_task = threading.Thread(target=generate_conflict_resolving_tasks, args=(app_context), daemon = True)
+    generator_task = threading.Thread(target=generate_conflict_resolving_tasks, args=(app_context,), daemon=True)
+    generator_task.start()
 
     app.run(debug = True,host='0.0.0.0', port=8080)
     

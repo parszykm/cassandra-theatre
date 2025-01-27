@@ -254,10 +254,10 @@ class BackendSession:
             WHERE reservation_id=%s
             """
             result = []
-            rows = self.session.execute(query, (reservation_id))
+            rows = self.session.execute(query, (uuid.UUID(reservation_id),))
             for row in rows:
-                reservation_id = uuid.UUID(row.reservation_id)
-                show_id = uuid.UUID(row.show_id)
+                reservation_id = row.reservation_id
+                show_id = row.show_id
                 reservation = {
                     "reservation_id": row.reservation_id,
                     "email": str(row.email),
@@ -269,18 +269,19 @@ class BackendSession:
                 SELECT title FROM shows
                 WHERE show_id=%s
                 """
-                show = self.session.execute(query, (show_id))
+                show = self.session.execute(query, (show_id,))
                 reservation["title"] = str(show[0].title)
                 
                 query = """
-                SELECT seat_id FROM reservations_by_user
-                WHERE reservation_id=%s
+                SELECT seat_id, reservation_id FROM reservations_by_user
+                WHERE show_id=%s
                 """
                 
-                seats_rows = self.session.execute(query, (reservation_id))
+                seats_rows = self.session.execute(query, (show_id,))
                 seats = []
                 for seat in seats_rows:
-                    seats.append(str(seat.seat_id))
+                    if seat.reservation_id == reservation_id:
+                        seats.append(str(seat.seat_id))
                 reservation["seats"] = seats
                 result.append(reservation)
             return result

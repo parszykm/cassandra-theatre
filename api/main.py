@@ -366,16 +366,7 @@ def shows():
 @app.route('/reservations', methods=['GET','POST'])
 def reservations():
     backend = BackendSession()
-    if request.method == 'GET':
-        reservation_id = request.args.get('reservation_id')
-        if not reservation_id:
-            return jsonify({'error': 'Missing required parameter: reservation_id'}), 400
-        reservations = backend.get_reservations(reservation_id=reservation_id)
-        if reservations is not None:
-            return jsonify(reservations), 200
-        else:
-            return jsonify({'error': 'Could not get reservations'}), 500
-    elif request.method == 'POST':
+    if request.method == 'POST':
         data = request.json
         email = data['email']
         user_name = data['user_name']

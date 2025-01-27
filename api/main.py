@@ -70,7 +70,6 @@ class BackendSession:
                 """
                 seat_already_taken = False
                 seats = self.session.execute(get_seat_query,(seat_id, uuid.UUID(show_id)))
-                print("przeszlo")
 
                 for seat in seats:
                     if seat.status == 'sold':
@@ -248,19 +247,20 @@ class BackendSession:
             print(f"Could not get the seats: {e}", file=sys.stderr)
             return None
         
-    def get_reservations(self, email):
+    def get_reservations(self, reservation_id):
         try:
             query = """
-            SELECT show_id, tickets_count, reservation_id, reservation_time FROM reservations_info
-            WHERE email=%s
+            SELECT show_id, tickets_count, reservation_id, reservation_time, email FROM reservations_info
+            WHERE reservation_id=%s
             """
             result = []
-            rows = self.session.execute(query, (email))
+            rows = self.session.execute(query, (reservation_id))
             for row in rows:
                 reservation_id = uuid.UUID(row.reservation_id)
                 show_id = uuid.UUID(row.show_id)
                 reservation = {
-                    "email": email,
+                    "reservation_id": row.reservation_id,
+                    "email": str(row.email),
                     "tickets": str(row.tickets_count),
                     "reservation_time": str(row.reservation_time)
                     }
@@ -289,9 +289,6 @@ class BackendSession:
             return None
     def check_seats_availability(self, show_id, seats):
         available_seats = set(self.get_seats(show_id))
-        print(available_seats)
-        print(seats)
-        print(all(seat in available_seats for seat in seats))
         return all(seat in available_seats for seat in seats)
     def make_reservation(self, email, show_id, seats, user_name):
         try:
@@ -312,8 +309,8 @@ class BackendSession:
             show_id = uuid.UUID(show_id) 
 
             # Check if the chosen seats are available
-            # if not self.check_seats_availability(show_id, seats):
-            #     return 1
+            if not self.check_seats_availability(show_id, seats):
+                return 1
             #COMMENTED FOR TEST PURPOUSE
 
             for seat in seats:
@@ -412,37 +409,34 @@ def resolve():
     backend.resolve_conflicts(show_id)
     return jsonify("Resolving conflicts"), 200
 
-def resolve_conflicts_task(app_context, show_id):
-    with app_context:
-        print("Resolving task initialized for show: ",show_id)
-        backend = BackendSession()
-        backend.resolve_conflicts(show_id)
-        print("Finished resolving conflicts for show: ", show_id)
+def resolve_conflicts_task(show_id):
+    print("Resolving task initialized for show: ",show_id)
+    backend = BackendSession()
+    backend.resolve_conflicts(show_id)
+    print("Finished resolving conflicts for show: ", show_id)
 
 
-def generate_conflict_resolving_tasks(app_context): 
+def generate_conflict_resolving_tasks(app): 
     global is_task_running
     if not is_task_running:
         is_task_running = True
 
         print("Conflicts resolving task initalized.")
     
-        with app_context:
+        with app.app_context():
             while True:
                 for show in shows_to_observe_cache:
                     print("Resolving conflicts for a show: ", show)
-                    task = threading.Thread(target=resolve_conflicts_task, args=(app_context,show), daemon = True)
+                    task = threading.Thread(target=resolve_conflicts_task, args=(show,), daemon = True)
                     task.start()
 
-                print("Sleeping 5 minutes before next conflicts resolving.")
+                print("Sleeping 1 minute before next conflicts resolving.")
                 time.sleep(1*60)
 
         
 if __name__ == '__main__':
-    app_context = app.app_context()
-    app_context.push()
 
-    generator_task = threading.Thread(target=generate_conflict_resolving_tasks, args=(app_context,), daemon=True)
+    generator_task = threading.Thread(target=generate_conflict_resolving_tasks, args=(app,), daemon=True)
     generator_task.start()
 
     app.run(debug = True,host='0.0.0.0', port=8080)

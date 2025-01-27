@@ -22,12 +22,12 @@ CREATE TABLE IF NOT EXISTS seats_by_show (
 ) WITH CLUSTERING ORDER BY (seat_id ASC);
 
 CREATE TABLE IF NOT EXISTS reservations_by_user (
-    reservation_id UUID,
     show_id UUID,
-    seat_id TEXT,
     seat_reservation_time TIMESTAMP,
-    PRIMARY KEY ((seat_reservation_time), reservation_id, seat_id)
-) WITH CLUSTERING ORDER BY (reservation_id ASC);
+    reservation_id UUID,
+    seat_id TEXT,
+    PRIMARY KEY ((show_id), seat_reservation_time, reservation_id)
+) WITH CLUSTERING ORDER BY (seat_reservation_time ASC, reservation_id ASC);
 
 CREATE TABLE IF NOT EXISTS reservations_info (
     reservation_id UUID,
@@ -36,5 +36,5 @@ CREATE TABLE IF NOT EXISTS reservations_info (
     user_name TEXT,
     email TEXT,
     reservation_time TIMESTAMP,
-    PRIMARY KEY ((email), show_id, reservation_time)
+    PRIMARY KEY ((reservation_id), show_id, reservation_time)
 ) WITH CLUSTERING ORDER BY (show_id DESC, reservation_time DESC);

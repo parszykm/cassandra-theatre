@@ -33,28 +33,20 @@ class BackendSession:
         try:
             winning_reservations, losing_reservations = self.get_winning_reservations(show_id)
             for winning_reservation in winning_reservations:
-                get_seats_query = """
-                SELECT seat_id
-                FROM reservations_by_user
-                where reservation_id = %s
-                ALLOW FILTERING
-                """
 
                 update_seat_query = """
                 UPDATE seats_by_show
                 SET reservation_id = %s, status = 'sold'
                 WHERE show_id = %s AND seat_id = %s
                 """
-                rows = self.session.execute(get_seats_query, (uuid.UUID(winning_reservation),))
 
-                resolved_reservations_cache.append(winning_reservation)
+                for seat_id in seats_by_reservation_id[winning_reservation]:
+                    self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), uuid.UUID(show_id), seat_id))
+                    seats_by_reservation_id[winning_reservation].remove(seat_id)
 
-                for row in rows:
-                    seat_id = row.seat_id
-                    self.session.execute(update_seat_query, (uuid.UUID(winning_reservation), show_id, seat_id))
+                seats_by_reservation_id.pop(winning_reservation)
 
             for losing_reservation in losing_reservations:
-                resolved_reservations_cache.append(losing_reservation)
                 print("Sending information about unsuccessful reservation to reservation:", losing_reservation)
         except Exception as e:
             print(f"Error while resolving conflicts for show {show_id}: {e}", file=sys.stderr)
@@ -77,7 +69,8 @@ class BackendSession:
                 where seat_id = %s and show_id = %s
                 """
                 seat_already_taken = False
-                seats = self.session.execute(get_seat_query,(seat_id, show_id))
+                seats = self.session.execute(get_seat_query,(seat_id, uuid.UUID(show_id)))
+                print("przeszlo")
 
                 for seat in seats:
                     if seat.status == 'sold':
@@ -97,7 +90,6 @@ class BackendSession:
                 SELECT reservation_id, reservation_time
                 FROM reservations_info
                 WHERE reservation_id = %s
-                ALLOW FILTERING
                 """
                 reservation_details = []
                 for reservation_id in reservation_ids:
@@ -155,7 +147,6 @@ class BackendSession:
             print(f"Error while grouping reservations for show {show_id}: {e}", file=sys.stderr)
             return None
     def get_reservations_for_show(self, show_id):
-        print("get_reservations_for_show:")
         try:
             # query = """
             # SELECT reservation_id, seat_id, seat_reservation_time
@@ -172,12 +163,11 @@ class BackendSession:
             WHERE show_id = %s
             AND seat_reservation_time <= %s
             AND seat_reservation_time > %s
-            ALLOW FILTERING
             """
 
             now = datetime.utcnow()
-            five_minutes_ago = now - timedelta(minutes=4)
-            ten_minutes_ago = now - timedelta(minutes=10)
+            five_minutes_ago = now - timedelta(minutes=1)
+            ten_minutes_ago = now - timedelta(minutes=2)
 
             rows = self.session.execute(query, (uuid.UUID(show_id), five_minutes_ago, ten_minutes_ago))
             #### jesli chcemy po czasie
@@ -190,10 +180,14 @@ class BackendSession:
                 "seat_reservation_time": str(row.seat_reservation_time)
                 }
 
+                if obj["reservation_id"] not in seats_by_reservation_id:
+                    seats_by_reservation_id[obj["reservation_id"]] = []
+
+                seats_by_reservation_id[obj["reservation_id"]].append(obj["seat_id"])
+
                 if obj["reservation_id"] not in resolved_reservations_cache:
                     results.append(obj)
 
-            print(results)
             return results
 
         except Exception as e:
@@ -337,6 +331,7 @@ app = Flask(__name__)
 
 resolved_reservations_cache = []
 shows_to_observe_cache = []
+seats_by_reservation_id = {}
 is_task_running = False
 
 @app.route('/', methods = ['GET', 'POST'])

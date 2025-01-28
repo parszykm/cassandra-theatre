@@ -16,7 +16,7 @@ Trzyma informacje o spektaklach w danym teatrze.
 | `show_date`     | `DATE`                                                | Data spektaklu                   |
 | `show_time`     | `TIME`                                                | Godzina spektaklu                |
 | `title`         | `TEXT`                                                | Tytuł spektaklu                  |
-| **PRIMARY KEY** | (`show_date`, `show_time`, `show_id`) | Klucz główny                     |
+| **PRIMARY KEY** | ((`show_date`, `show_time`), `show_id`) | Klucz główny                     |
 
 ---
 
@@ -32,7 +32,7 @@ Trzyma informacje o spektaklach w danym teatrze.
 | `status`           | `TEXT`                 | Status (available, reserved, sold)   |
 | `reservation_id`   | `UUID`                 | Id rezerwacji                       |
 | `reservation_time` | `TIMESTAMP`            | Czas rezerwacji                      |
-| **PRIMARY KEY**    | (`show_id`, `seat_id`) | Klucz główny                         |
+| **PRIMARY KEY**    | ((`show_id`), `seat_id`) | Klucz główny                         |
 
 - Kolumna `status` pozwala na zarządzanie dostępnością miejsc (np. `available`, `reserved`, `sold`).
 
@@ -48,7 +48,7 @@ Przechowuje listę rezerwacji użytkownika.
 | `show_id`          | `UUID`                        | Id spektaklu              |
 | `seat_id`          | `TEXT`                        | Id miejsca                |
 | `seat_reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`seat_reservation_time`,`reservation_id`, `seat_id`) | Klucz główny               |
+| **PRIMARY KEY**    | ((show_id), seat_reservation_time, reservation_id) | Klucz główny               |
 
 ---
 
@@ -64,7 +64,7 @@ Przechowuje szczegóły o rezerwacji.
 | `user_name`        | `TEXT`                        | Imię i nazwisko użytkownika |
 | `email`            | `TEXT`                        | Email użytkownika         |
 | `reservation_time` | `TIMESTAMP`                   | Czas rezerwacji           |
-| **PRIMARY KEY**    | (`email`, `reservation_id`) | Klucz główny               |
+| **PRIMARY KEY**    | ((reservation_id), show_id, reservation_time) | Klucz główny               |
 
 ---
 
